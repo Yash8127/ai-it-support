@@ -3,7 +3,6 @@ package com.yaswanth.itsupport.dto;
 import com.yaswanth.itsupport.enums.TicketPriority;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 public class TicketRequest {
@@ -16,10 +15,8 @@ public class TicketRequest {
 	@Size(min = 10, max = 1000, message = "Description must be between 10 and 1000 characters")
 	private String description;
 
-	@NotBlank(message = "Category is required")
 	private String category;
 
-	@NotNull(message = "Priority is required")
 	private TicketPriority priority;
 
 	public String getTitle() {

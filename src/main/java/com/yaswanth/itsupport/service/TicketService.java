@@ -5,6 +5,9 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 
+import com.yaswanth.itsupport.ai.AiPriorityService;
+import com.yaswanth.itsupport.ai.AiTicketAnalyzer;
+import com.yaswanth.itsupport.dto.AiTicketAnalysisResponse;
 import com.yaswanth.itsupport.dto.TicketRequest;
 import com.yaswanth.itsupport.dto.TicketResponse;
 import com.yaswanth.itsupport.entity.Ticket;
@@ -17,9 +20,17 @@ import com.yaswanth.itsupport.repository.TicketRepository;
 public class TicketService {
 
 	private final TicketRepository ticketRepository;
+	private final AiTicketAnalyzer aiTicketAnalyzer;
+	private final AiPriorityService aiPriorityService;
 
-	public TicketService(TicketRepository ticketRepository) {
-		this.ticketRepository = ticketRepository;
+	public TicketService(
+	        TicketRepository ticketRepository,
+	        AiTicketAnalyzer aiTicketAnalyzer,
+	        AiPriorityService aiPriorityService) {
+
+	    this.ticketRepository = ticketRepository;
+	    this.aiTicketAnalyzer = aiTicketAnalyzer;
+	    this.aiPriorityService = aiPriorityService;
 	}
 
 	// CREATE TICKET
@@ -29,10 +40,23 @@ public class TicketService {
 
 		ticket.setTitle(request.getTitle());
 		ticket.setDescription(request.getDescription());
-		ticket.setCategory(request.getCategory());
-		ticket.setPriority(request.getPriority());
 
-		// Server controlled fields
+		// Send title and description to AI
+		String message = request.getTitle() + "\n" + request.getDescription();
+
+		AiTicketAnalysisResponse analysis =
+		        aiTicketAnalyzer.analyzeTicket(message);
+		// AI-generated category
+		ticket.setCategory(analysis.getCategory());
+
+		// AI-generated priority
+		String priority = aiPriorityService.determinePriority(request.getTitle(), request.getDescription());
+
+		ticket.setPriority(TicketPriority.valueOf(priority));
+		// AI-generated troubleshooting suggestion
+		ticket.setAiSuggestion(analysis.getSuggestion());
+
+		// Server-controlled fields
 		ticket.setStatus(TicketStatus.OPEN);
 		ticket.setCreatedAt(LocalDateTime.now());
 
@@ -45,7 +69,7 @@ public class TicketService {
 	private TicketResponse convertToResponse(Ticket ticket) {
 
 		return new TicketResponse(ticket.getId(), ticket.getTitle(), ticket.getDescription(), ticket.getCategory(),
-				ticket.getPriority(), ticket.getStatus(), ticket.getCreatedAt());
+				ticket.getPriority(), ticket.getStatus(), ticket.getAiSuggestion(), ticket.getCreatedAt());
 	}
 
 	// GET ALL TICKETS
@@ -87,39 +111,30 @@ public class TicketService {
 
 		ticketRepository.delete(ticket);
 	}
-	
-	//FILTER TICKETS BY STATUS
+
+	// FILTER TICKETS BY STATUS
 
 	public List<TicketResponse> getTicketsByStatus(TicketStatus status) {
 
 		return ticketRepository.findByStatus(status).stream().map(this::convertToResponse).toList();
 	}
-	//FILTER TICKETS BY PRIORITY
-	public List<TicketResponse> getTicketsByPriority(
-	        TicketPriority priority) {
 
-	    return ticketRepository.findByPriority(priority)
-	            .stream()
-	            .map(this::convertToResponse)
-	            .toList();
-	}
-	//FILTER TICKETS BY STATUS AND PRIORITY
-	public List<TicketResponse> getTicketsByStatusAndPriority(
-	        TicketStatus status,
-	        TicketPriority priority) {
+	// FILTER TICKETS BY PRIORITY
+	public List<TicketResponse> getTicketsByPriority(TicketPriority priority) {
 
-	    return ticketRepository
-	            .findByStatusAndPriority(status, priority)
-	            .stream()
-	            .map(this::convertToResponse)
-	            .toList();
+		return ticketRepository.findByPriority(priority).stream().map(this::convertToResponse).toList();
 	}
-	//FILTER TICKETS BY CTAEGORY OR DESCRIPTION
+
+	// FILTER TICKETS BY STATUS AND PRIORITY
+	public List<TicketResponse> getTicketsByStatusAndPriority(TicketStatus status, TicketPriority priority) {
+
+		return ticketRepository.findByStatusAndPriority(status, priority).stream().map(this::convertToResponse)
+				.toList();
+	}
+
+	// FILTER TICKETS BY CTAEGORY OR DESCRIPTION
 	public List<TicketResponse> searchTickets(String keyword) {
 
-	    return ticketRepository.searchTickets(keyword)
-	            .stream()
-	            .map(this::convertToResponse)
-	            .toList();
+		return ticketRepository.searchTickets(keyword).stream().map(this::convertToResponse).toList();
 	}
 }

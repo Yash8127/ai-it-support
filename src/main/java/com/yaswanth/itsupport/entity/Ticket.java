@@ -22,24 +22,27 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class Ticket {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	private Long id;
 
-    private String title;
+	private String title;
 
-    @Column(columnDefinition = "TEXT")
-    private String description;
+	@Column(columnDefinition = "TEXT")
+	private String description;
 
-    private String category;
+	private String category;
 
-    @Enumerated(EnumType.STRING)
-    private TicketPriority priority;
+	@Enumerated(EnumType.STRING)
+	private TicketPriority priority;
 
-    @Enumerated(EnumType.STRING)
-    private TicketStatus status;
+	@Enumerated(EnumType.STRING)
+	private TicketStatus status;
+	
+	@Column(columnDefinition = "TEXT")
+	private String aiSuggestion;
 
-    private LocalDateTime createdAt;
+	private LocalDateTime createdAt;
 
-    // Getters and Setters
+	// Getters and Setters
 }
