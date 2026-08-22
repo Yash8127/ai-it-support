@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 import com.yaswanth.itsupport.dto.TicketResponse;
 import com.yaswanth.itsupport.enums.TicketPriority;
 import com.yaswanth.itsupport.enums.TicketStatus;
+import com.yaswanth.itsupport.expection.TicketNotFoundException;
 import com.yaswanth.itsupport.service.TicketService;
 
 @Component
@@ -353,6 +354,108 @@ public class TicketTools {
 		System.out.println(">>> TOOL RESULT COUNT: " + tickets.size());
 
 		return buildTicketListResult(tickets);
+	}
+	// =========================================================
+	// 6. UPDATE THE TICKET STATUS
+	// =========================================================
+
+	@Tool(description = """
+			Update ONLY the status of an existing IT support ticket.
+
+			Use this tool when the user explicitly asks to:
+			- change a ticket status
+			- update a ticket status
+			- resolve a ticket
+			- close a ticket
+			- reopen a ticket
+			- move a ticket to in progress
+
+			Required parameters:
+			id
+			status
+
+			Valid statuses:
+			OPEN
+			IN_PROGRESS
+			RESOLVED
+			CLOSED
+
+			Examples:
+
+			"Mark ticket 17 as resolved"
+			-> id = 17
+			-> status = RESOLVED
+
+			"Close ticket 15"
+			-> id = 15
+			-> status = CLOSED
+
+			"Reopen ticket 12"
+			-> id = 12
+			-> status = OPEN
+
+			"Move ticket 9 to in progress"
+			-> id = 9
+			-> status = IN_PROGRESS
+
+			This tool changes ONLY the status.
+			Do not modify title, description, category, or priority.
+			""")
+	public String updateTicketStatus(
+
+			@ToolParam(description = """
+					Exact numeric ticket ID.
+					""") Long id,
+
+			@ToolParam(description = """
+					New ticket status.
+					Must be one of:
+					OPEN,
+					IN_PROGRESS,
+					RESOLVED,
+					CLOSED.
+					""") TicketStatus status) {
+
+		System.out.println(">>> AI TOOL CALLED: updateTicketStatus(" + id + ", " + status + ")");
+
+		if (id == null) {
+			System.out.println(">>> ERROR: Ticket ID is null");
+			return "TOOL_ERROR: Ticket ID is required.";
+		}
+
+		if (status == null) {
+			System.out.println(">>> ERROR: Status is null");
+			return "TOOL_ERROR: Status is required.";
+		}
+
+		try {
+
+			TicketResponse ticket = ticketService.updateTicketStatus(id, status);
+
+			System.out.println(">>> TICKET UPDATED: ID=" + ticket.getId() + " STATUS=" + ticket.getStatus());
+
+			return """
+					TOOL_SUCCESS
+					Ticket ID: %s
+					Title: %s
+					Category: %s
+					Priority: %s
+					Status: %s
+					""".formatted(ticket.getId(), ticket.getTitle(), ticket.getCategory(), ticket.getPriority(),
+					ticket.getStatus());
+
+		} catch (TicketNotFoundException e) {
+
+			System.out.println(">>> TICKET NOT FOUND: " + id);
+
+			return "NO_TICKET_FOUND";
+
+		} catch (Exception e) {
+
+			System.out.println(">>> ERROR UPDATING TICKET: " + e.getMessage());
+
+			return "TOOL_ERROR: Unable to update ticket.";
+		}
 	}
 
 	// =========================================================

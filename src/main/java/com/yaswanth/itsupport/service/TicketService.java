@@ -5,7 +5,6 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 
-import com.yaswanth.itsupport.ai.AiPriorityService;
 import com.yaswanth.itsupport.ai.AiTicketAnalyzer;
 import com.yaswanth.itsupport.dto.AiTicketAnalysisResponse;
 import com.yaswanth.itsupport.dto.TicketRequest;
@@ -21,16 +20,12 @@ public class TicketService {
 
 	private final TicketRepository ticketRepository;
 	private final AiTicketAnalyzer aiTicketAnalyzer;
-	private final AiPriorityService aiPriorityService;
 
-	public TicketService(
-	        TicketRepository ticketRepository,
-	        AiTicketAnalyzer aiTicketAnalyzer,
-	        AiPriorityService aiPriorityService) {
+	public TicketService(TicketRepository ticketRepository, AiTicketAnalyzer aiTicketAnalyzer) {
 
-	    this.ticketRepository = ticketRepository;
-	    this.aiTicketAnalyzer = aiTicketAnalyzer;
-	    this.aiPriorityService = aiPriorityService;
+		this.ticketRepository = ticketRepository;
+		this.aiTicketAnalyzer = aiTicketAnalyzer;
+
 	}
 
 	// CREATE TICKET
@@ -42,25 +37,38 @@ public class TicketService {
 		ticket.setDescription(request.getDescription());
 
 		// Send title and description to AI
-		String message = request.getTitle() + "\n" + request.getDescription();
+		String message = """
+				Title: %s
+				Description: %s
+				""".formatted(request.getTitle(), request.getDescription());
 
-		AiTicketAnalysisResponse analysis =
-		        aiTicketAnalyzer.analyzeTicket(message);
+		System.out.println(">>> AI TICKET ANALYSIS STARTED");
+
+		AiTicketAnalysisResponse analysis = aiTicketAnalyzer.analyzeTicket(message);
+
+		System.out.println(">>> AI CATEGORY: " + analysis.getCategory());
+		System.out.println(">>> AI PRIORITY: " + analysis.getPriority());
+		System.out.println(">>> AI SUGGESTION: " + analysis.getSuggestion());
+
 		// AI-generated category
 		ticket.setCategory(analysis.getCategory());
 
 		// AI-generated priority
-		String priority = aiPriorityService.determinePriority(request.getTitle(), request.getDescription());
+		TicketPriority priority = TicketPriority.valueOf(analysis.getPriority().trim().toUpperCase());
 
-		ticket.setPriority(TicketPriority.valueOf(priority));
-		// AI-generated troubleshooting suggestion
+		ticket.setPriority(priority);
+
+		// AI-generated suggestion
 		ticket.setAiSuggestion(analysis.getSuggestion());
 
 		// Server-controlled fields
 		ticket.setStatus(TicketStatus.OPEN);
 		ticket.setCreatedAt(LocalDateTime.now());
 
+		// Save ticket
 		Ticket savedTicket = ticketRepository.save(ticket);
+
+		System.out.println(">>> TICKET CREATED WITH ID: " + savedTicket.getId());
 
 		return convertToResponse(savedTicket);
 	}
@@ -97,6 +105,19 @@ public class TicketService {
 		existingTicket.setDescription(request.getDescription());
 		existingTicket.setCategory(request.getCategory());
 		existingTicket.setPriority(request.getPriority());
+
+		Ticket updatedTicket = ticketRepository.save(existingTicket);
+
+		return convertToResponse(updatedTicket);
+	}
+
+	// UPDATE ONLY TICKET STATUS
+	public TicketResponse updateTicketStatus(Long id, TicketStatus status) {
+
+		Ticket existingTicket = ticketRepository.findById(id)
+				.orElseThrow(() -> new TicketNotFoundException("Ticket not found with id: " + id));
+
+		existingTicket.setStatus(status);
 
 		Ticket updatedTicket = ticketRepository.save(existingTicket);
 

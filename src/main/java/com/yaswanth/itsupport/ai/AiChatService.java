@@ -43,10 +43,17 @@ public class AiChatService {
 				TOOL SELECTION
 				==============================
 
-				RULE 1: SPECIFIC TICKET ID
+				RULE 1: SPECIFIC TICKET INFORMATION
 
-				If the user gives a specific ticket ID,
+				If the user provides a specific ticket ID and asks
+				to VIEW, SHOW, GET, or DISPLAY that ticket's details,
+
 				use getTicketById.
+
+				IMPORTANT:
+
+				If the user provides a ticket ID AND asks to change
+				the ticket status, use updateTicketStatus instead.
 
 				Example:
 				"Show ticket 15"
@@ -136,6 +143,77 @@ public class AiChatService {
 
 				"Find login problems"
 				-> searchTickets(keyword="login")
+
+				RULE 6: UPDATE TICKET STATUS
+
+				If the user explicitly asks to change, update, resolve, close,
+				reopen, or move a specific ticket to another status,
+
+				use ONLY:
+
+				updateTicketStatus
+
+				The tool requires:
+
+				id
+				status
+
+				Valid statuses:
+
+				OPEN
+				IN_PROGRESS
+				RESOLVED
+				CLOSED
+
+				Examples:
+
+				"Mark ticket 17 as resolved"
+
+				-> updateTicketStatus(
+				       id=17,
+				       status=RESOLVED
+				   )
+
+				"Close ticket 15"
+
+				-> updateTicketStatus(
+				       id=15,
+				       status=CLOSED
+				   )
+
+				"Reopen ticket 12"
+
+				-> updateTicketStatus(
+				       id=12,
+				       status=OPEN
+				   )
+
+				"Move ticket 9 to in progress"
+
+				-> updateTicketStatus(
+				       id=9,
+				       status=IN_PROGRESS
+				   )
+
+				IMPORTANT:
+
+				The ticket ID MUST come from the user's message.
+
+				The new status MUST come from the user's message.
+
+				Never invent a ticket ID.
+
+				Never invent a status.
+
+				Do NOT use getTicketsByStatus for updating a ticket.
+
+				Do NOT use searchTickets for updating a ticket.
+
+				Do NOT use getTicketById when the user wants to change
+				the ticket status.
+
+				The updateTicketStatus tool changes ONLY the ticket status.
+				Do not modify title, description, category, or priority.
 
 
 				==============================
@@ -294,6 +372,76 @@ public class AiChatService {
 				Respond:
 
 				The ticket request could not be completed.
+
+				==============================
+				UPDATE TICKET RESULT
+				==============================
+
+				When updateTicketStatus is used:
+
+				If the tool returns TOOL_SUCCESS,
+				the ticket was successfully updated.
+
+				Use ONLY the information returned by the tool.
+
+				Display:
+
+				Ticket ID
+				Title
+				Category
+				Priority
+				Status
+
+				The Status shown MUST be the new status returned by the tool.
+
+				Example:
+
+				Tool result:
+
+				TOOL_SUCCESS
+				Ticket ID: 17
+				Title: Laptop WiFi problem
+				Category: NETWORK
+				Priority: MEDIUM
+				Status: RESOLVED
+
+				Correct response:
+
+				Ticket updated successfully.
+
+				Ticket ID: 17
+				Title: Laptop WiFi problem
+				Category: NETWORK
+				Priority: MEDIUM
+				Status: RESOLVED
+
+
+				If the tool returns:
+
+				NO_TICKET_FOUND
+
+				respond:
+
+				Ticket not found.
+
+
+				If the tool returns:
+
+				TOOL_ERROR
+
+				respond:
+
+				The ticket could not be updated.
+
+
+				IMPORTANT:
+
+				Never say that a ticket was updated unless
+				the tool returned TOOL_SUCCESS.
+
+				Never invent the updated status.
+
+				Never invent ticket information.
 
 
 				==============================
