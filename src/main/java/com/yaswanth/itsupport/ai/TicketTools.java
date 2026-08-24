@@ -457,6 +457,45 @@ public class TicketTools {
 			return "TOOL_ERROR: Unable to update ticket.";
 		}
 	}
+	// =========================================================
+	// 6. DELETE TICKET
+	// =========================================================
+
+	@Tool(description = """
+			Delete an existing IT support ticket using its ticket ID.
+
+			IMPORTANT:
+			Use this tool ONLY after the user has explicitly confirmed
+			that they want to delete the ticket.
+
+			Do NOT use this tool immediately when the user first asks
+			to delete a ticket.
+
+			Required parameter:
+			id = ticket ID
+			""")
+	public String deleteTicket(Long id) {
+
+		System.out.println(">>> AI TOOL CALLED: deleteTicket [" + id + "]");
+
+		if (id == null) {
+			System.out.println(">>> ERROR: Ticket ID is null");
+			return "TOOL_ERROR: Ticket ID is required.";
+		}
+
+		try {
+
+			ticketService.deleteTicket(id);
+
+			return "TICKET_DELETED\n" + "ID=" + id;
+
+		} catch (Exception e) {
+
+			System.out.println(">>> ERROR: " + e.getMessage());
+
+			return "TOOL_ERROR: " + e.getMessage();
+		}
+	}
 
 	// =========================================================
 	// COMMON RESULT FORMAT
