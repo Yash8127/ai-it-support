@@ -503,26 +503,47 @@ public class TicketTools {
 
 	private String buildTicketListResult(List<TicketResponse> tickets) {
 
-		if (tickets == null || tickets.isEmpty()) {
+	    if (tickets == null || tickets.isEmpty()) {
+	        return """
+	                NO_TICKETS_FOUND
+	                """;
+	    }
 
-			return "NO_TICKETS_FOUND";
-		}
+	    StringBuilder result = new StringBuilder();
 
-		StringBuilder result = new StringBuilder();
+	    result.append("TOOL_SUCCESS\n");
+	    result.append("TICKET_COUNT=").append(tickets.size()).append("\n");
+	    result.append("TICKETS_FOUND=TRUE\n");
+	    result.append("BEGIN_TICKETS\n");
 
-		result.append("TOOL_SUCCESS\n");
-		result.append("TICKET_COUNT=").append(tickets.size()).append("\n");
+	    for (TicketResponse ticket : tickets) {
 
-		for (TicketResponse ticket : tickets) {
+	        result.append("TICKET\n");
 
-			result.append("TICKET\n");
-			result.append("ID=").append(ticket.getId()).append("\n");
-			result.append("TITLE=").append(ticket.getTitle()).append("\n");
-			result.append("CATEGORY=").append(ticket.getCategory()).append("\n");
-			result.append("PRIORITY=").append(ticket.getPriority()).append("\n");
-			result.append("STATUS=").append(ticket.getStatus()).append("\n");
-		}
+	        result.append("ID=")
+	                .append(ticket.getId())
+	                .append("\n");
 
-		return result.toString();
-	}
-}
+	        result.append("TITLE=")
+	                .append(ticket.getTitle())
+	                .append("\n");
+
+	        result.append("CATEGORY=")
+	                .append(ticket.getCategory())
+	                .append("\n");
+
+	        result.append("PRIORITY=")
+	                .append(ticket.getPriority())
+	                .append("\n");
+
+	        result.append("STATUS=")
+	                .append(ticket.getStatus())
+	                .append("\n");
+
+	        result.append("END_TICKET\n");
+	    }
+
+	    result.append("END_TICKETS\n");
+
+	    return result.toString();
+	}}

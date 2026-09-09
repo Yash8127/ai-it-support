@@ -57,6 +57,14 @@ public class TicketController {
 
 		return ticketService.updateTicket(id, request);
 	}
+	//Updating the status
+	@PutMapping("/{id}/status")
+	public TicketResponse updateTicketStatus(
+	        @PathVariable Long id,
+	        @RequestParam TicketStatus status) {
+
+	    return ticketService.updateTicketStatus(id, status);
+	}
 
 	@DeleteMapping("/{id}")
 	public ResponseEntity<Map<String, Object>> deleteTicket(@PathVariable Long id) {

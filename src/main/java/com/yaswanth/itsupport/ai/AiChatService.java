@@ -46,597 +46,1012 @@ public class AiChatService {
 
 	public String chat(String message) {
 
-		System.out.println(">>> CHAT METHOD CALLED: " + message);
+	    System.out.println(">>> CHAT METHOD CALLED: " + message);
 
-		String lowerMessage = message.trim().toLowerCase();
+	    String lowerMessage = message.trim().toLowerCase();
 
-		// =====================================================
-		// 1. HANDLE PENDING DELETE CONFIRMATION
-		// =====================================================
+	    // =====================================================
+	    // 1. HANDLE PENDING DELETE CONFIRMATION
+	    // =====================================================
 
-		if (pendingDeleteTicketId != null) {
+	    if (pendingDeleteTicketId != null) {
 
-			// USER CONFIRMED
-			if (lowerMessage.equals("yes") || lowerMessage.equals("confirm") || lowerMessage.equals("delete it")
-					|| lowerMessage.equals("proceed") || lowerMessage.equals("yes, delete it")) {
+	        // USER CONFIRMED
+	        if (lowerMessage.equals("yes")
+	                || lowerMessage.equals("confirm")
+	                || lowerMessage.equals("delete it")
+	                || lowerMessage.equals("proceed")
+	                || lowerMessage.equals("yes, delete it")) {
 
-				Long id = pendingDeleteTicketId;
+	            Long id = pendingDeleteTicketId;
 
-				// Clear state BEFORE tool call
-				pendingDeleteTicketId = null;
+	            // Clear state BEFORE tool call
+	            pendingDeleteTicketId = null;
 
-				System.out.println(">>> DELETE CONFIRMED FOR TICKET: " + id);
+	            System.out.println(">>> DELETE CONFIRMED FOR TICKET: " + id);
 
-				return chatClient.prompt().system("""
-						You are an IT support assistant.
+	            return chatClient.prompt()
+	                    .system("""
+	                            You are an IT support assistant.
 
-						Delete ONLY the ticket whose ID is provided
-						by the user.
+	                            Delete ONLY the ticket whose ID is provided
+	                            by the user.
 
-						Use the deleteTicket tool.
+	                            Use the deleteTicket tool.
 
-						Do not use any other ticket tool.
+	                            Do not use any other ticket tool.
 
-						If the tool returns TICKET_DELETED:
-						respond exactly:
+	                            If the tool returns TICKET_DELETED:
 
-						Ticket deleted successfully.
+	                            respond exactly:
 
-						If the tool returns TOOL_ERROR:
-						respond exactly:
+	                            Ticket deleted successfully.
 
-						The ticket could not be deleted.
+	                            If the tool returns TOOL_ERROR:
 
-						Do not invent information.
-						Do not output JSON.
-						Do not mention internal tools.
-						""").user("Delete ticket " + id).tools(ticketTools).call().content();
-			}
+	                            respond exactly:
 
-			// USER CANCELLED
-			if (lowerMessage.equals("no") || lowerMessage.equals("cancel") || lowerMessage.equals("don't delete")
-					|| lowerMessage.equals("do not delete")) {
+	                            The ticket could not be deleted.
 
-				System.out.println(">>> DELETE CANCELLED FOR TICKET: " + pendingDeleteTicketId);
+	                            Do not invent information.
+	                            Do not output JSON.
+	                            Do not mention internal tools.
+	                            """)
+	                    .user("Delete ticket " + id)
+	                    .tools(ticketTools)
+	                    .call()
+	                    .content();
+	        }
 
-				pendingDeleteTicketId = null;
+	        // USER CANCELLED
+	        if (lowerMessage.equals("no")
+	                || lowerMessage.equals("cancel")
+	                || lowerMessage.equals("don't delete")
+	                || lowerMessage.equals("do not delete")) {
 
-				return "Ticket deletion cancelled.";
-			}
+	            System.out.println(
+	                    ">>> DELETE CANCELLED FOR TICKET: "
+	                            + pendingDeleteTicketId
+	            );
 
-			// INVALID CONFIRMATION RESPONSE
-			return """
-					Please confirm the deletion.
+	            pendingDeleteTicketId = null;
 
-					Reply "Yes" to delete the ticket or
-					"No" to cancel.
-					""";
-		}
+	            return "Ticket deletion cancelled.";
+	        }
 
-		// =====================================================
-		// 2. DETECT NEW DELETE REQUEST
-		// =====================================================
+	        // INVALID CONFIRMATION RESPONSE
+	        return """
+	                Please confirm the deletion.
 
-		if (lowerMessage.startsWith("delete ticket ")) {
+	                Reply "Yes" to delete the ticket or
+	                "No" to cancel.
+	                """;
+	    }
 
-			String idText = lowerMessage.substring("delete ticket ".length()).trim();
+	    // =====================================================
+	    // 2. DETECT NEW DELETE REQUEST
+	    // =====================================================
 
-			try {
+	    if (lowerMessage.startsWith("delete ticket ")) {
 
-				Long id = Long.parseLong(idText);
+	        String idText =
+	                lowerMessage.substring("delete ticket ".length()).trim();
 
-				System.out.println(">>> DELETE REQUEST FOR TICKET: " + id);
+	        try {
 
-				// Check ticket exists
-				TicketResponse ticket = ticketService.getTicketById(id);
+	            Long id = Long.parseLong(idText);
 
-				// Store pending delete
-				pendingDeleteTicketId = id;
+	            System.out.println(
+	                    ">>> DELETE REQUEST FOR TICKET: " + id
+	            );
 
-				System.out.println(">>> DELETE CONFIRMATION PENDING FOR: " + id);
+	            // Check ticket exists
+	            TicketResponse ticket =
+	                    ticketService.getTicketById(id);
 
-				return """
-						Ticket %d - %s is about to be deleted.
+	            // Store pending delete
+	            pendingDeleteTicketId = id;
 
-						Are you sure you want to delete this ticket?
-						Reply "Yes" to delete or "No" to cancel.
-						""".formatted(ticket.getId(), ticket.getTitle());
+	            System.out.println(
+	                    ">>> DELETE CONFIRMATION PENDING FOR: " + id
+	            );
 
-			} catch (NumberFormatException e) {
+	            return """
+	                    Ticket %d - %s is about to be deleted.
 
-				return "Invalid ticket ID.";
+	                    Are you sure you want to delete this ticket?
 
-			} catch (Exception e) {
+	                    Reply "Yes" to delete or "No" to cancel.
+	                    """.formatted(
+	                    ticket.getId(),
+	                    ticket.getTitle()
+	            );
 
-				System.out.println(">>> DELETE REQUEST ERROR: " + e.getMessage());
+	        } catch (NumberFormatException e) {
 
-				return "Ticket could not be found.";
-			}
-		}
+	            return "Invalid ticket ID.";
 
-		// =====================================================
-		// 3. NORMAL AI CHAT
-		// =====================================================
+	        } catch (Exception e) {
+
+	            System.out.println(
+	                    ">>> DELETE REQUEST ERROR: "
+	                            + e.getMessage()
+	            );
 
-		return chatClient.prompt().system("""
-				You are an AI IT Support Assistant.
+	            return "Ticket could not be found.";
+	        }
+	    }
 
-				Your job is to answer IT support questions and
-				retrieve existing ticket information using tools.
+	    // =====================================================
+	    // 3. NORMALIZE MESSAGE
+	    // =====================================================
+
+	    String normalizedMessage = lowerMessage
+	            .replace("-", " ")
+	            .replace("_", " ")
+	            .replaceAll("\\s+", " ")
+	            .trim();
+
+	    // =====================================================
+	    // 4. CHECK WHETHER THIS IS A TICKET LIST REQUEST
+	    // =====================================================
+
+	    boolean ticketListRequest =
+	            normalizedMessage.contains("tickets")
+	            || normalizedMessage.contains("ticket list")
+	            || normalizedMessage.contains("show me")
+	            || normalizedMessage.startsWith("show ")
+	            || normalizedMessage.startsWith("list ")
+	            || normalizedMessage.startsWith("find ")
+	            || normalizedMessage.startsWith("display ")
+	            || normalizedMessage.startsWith("get ");
+
+	    // =====================================================
+	    // 5. DETECT SPECIFIC TICKET ID
+	    //
+	    // Example:
+	    // Show ticket 17
+	    //
+	    // Do NOT intercept this.
+	    // Let the normal AI logic use getTicketById.
+	    // =====================================================
+
+	    boolean specificTicketRequest =
+	            normalizedMessage.matches(
+	                    ".*\\bticket\\s+#?\\d+\\b.*"
+	            );
+
+	    // =====================================================
+	    // 6. DETECT STATUS
+	    // =====================================================
+
+	    String detectedStatus = null;
+
+	    if (ticketListRequest && !specificTicketRequest) {
+
+	        if (normalizedMessage.matches(".*\\bopen\\b.*")) {
+
+	            detectedStatus = "OPEN";
+
+	        } else if (
+	                normalizedMessage.contains("in progress")
+	                || normalizedMessage.contains("in-progress")
+	        ) {
+
+	            detectedStatus = "IN_PROGRESS";
+
+	        } else if (
+	                normalizedMessage.matches(".*\\bresolved\\b.*")
+	        ) {
+
+	            detectedStatus = "RESOLVED";
+
+	        } else if (
+	                normalizedMessage.matches(".*\\bclosed\\b.*")
+	        ) {
+
+	            detectedStatus = "CLOSED";
+	        }
+	    }
+
+	    // =====================================================
+	    // 7. DETECT PRIORITY
+	    // =====================================================
+
+	    String detectedPriority = null;
+
+	    if (ticketListRequest && !specificTicketRequest) {
+
+	        // CRITICAL
+	        if (
+	                normalizedMessage.contains("critical priority")
+	                || normalizedMessage.matches(
+	                        ".*\\bcritical\\b.*tickets?.*"
+	                )
+	                || normalizedMessage.matches(
+	                        ".*\\bcritical\\b.*priority.*"
+	                )
+	        ) {
 
-				==================================================
-				ABSOLUTE RULE
-				==================================================
+	            detectedPriority = "CRITICAL";
 
-				NEVER invent ticket information.
+	        }
 
-				The result returned by a ticket tool is the ONLY
-				source of ticket information.
+	        // HIGH
+	        else if (
+	                normalizedMessage.contains("high priority")
+	                || normalizedMessage.matches(
+	                        ".*\\bhigh\\b.*tickets?.*"
+	                )
+	                || normalizedMessage.matches(
+	                        ".*\\bhigh\\b.*priority.*"
+	                )
+	        ) {
 
-				If a tool returns ticket records, display those
-				records.
+	            detectedPriority = "HIGH";
 
-				DO NOT replace ticket records with general IT
-				advice.
+	        }
 
-				DO NOT ignore a successful tool result.
+	        // MEDIUM
+	        else if (
+	                normalizedMessage.contains("medium priority")
+	                || normalizedMessage.matches(
+	                        ".*\\bmedium\\b.*tickets?.*"
+	                )
+	                || normalizedMessage.matches(
+	                        ".*\\bmedium\\b.*priority.*"
+	                )
+	        ) {
 
-				==================================================
-				TOOL SELECTION
-				==================================================
+	            detectedPriority = "MEDIUM";
 
-				RULE 1 - SPECIFIC TICKET ID
+	        }
 
-				If the user asks about one specific ticket ID,
-				use getTicketById.
+	        // LOW
+	        else if (
+	                normalizedMessage.contains("low priority")
+	                || normalizedMessage.matches(
+	                        ".*\\blow\\b.*tickets?.*"
+	                )
+	                || normalizedMessage.matches(
+	                        ".*\\blow\\b.*priority.*"
+	                )
+	        ) {
 
-				Example:
+	            detectedPriority = "LOW";
+	        }
+	    }
 
-				User:
-				Show ticket 17
+	    // =====================================================
+	    // 8. STATUS + PRIORITY
+	    // =====================================================
 
-				Tool:
-				getTicketById(id=17)
+	    if (
+	            ticketListRequest
+	            && !specificTicketRequest
+	            && detectedStatus != null
+	            && detectedPriority != null
+	    ) {
 
+	        System.out.println(
+	                ">>> DETECTED STATUS + PRIORITY: "
+	                        + detectedStatus
+	                        + ", "
+	                        + detectedPriority
+	        );
 
-				==================================================
-				RULE 2 - STATUS AND PRIORITY
-				==================================================
+	        String finalStatus = detectedStatus;
+	        String finalPriority = detectedPriority;
 
-				If BOTH status and priority are present,
-				use ONLY:
+	        return chatClient.prompt()
+	                .system("""
+	                        You are an AI IT Support Assistant.
 
-				getTicketsByStatusAndPriority
+	                        The user's request contains BOTH a ticket
+	                        status and a ticket priority.
 
-				Example:
+	                        You MUST use ONLY:
 
-				Show open high priority tickets
+	                        getTicketsByStatusAndPriority
 
-				status = OPEN
-				priority = HIGH
+	                        Exact status:
 
+	                        %s
 
-				Example:
+	                        Exact priority:
 
-				Show critical open tickets
+	                        %s
 
-				status = OPEN
-				priority = CRITICAL
+	                        IMPORTANT:
 
+	                        CRITICAL is a PRIORITY.
+	                        CRITICAL is NEVER a STATUS.
 
-				==================================================
-				RULE 3 - PRIORITY ONLY
-				==================================================
+	                        HIGH is a PRIORITY.
+	                        HIGH is NEVER a STATUS.
 
-				If ONLY priority is present,
-				use ONLY:
+	                        MEDIUM is a PRIORITY.
+	                        MEDIUM is NEVER a STATUS.
 
-				getTicketsByPriority
+	                        LOW is a PRIORITY.
+	                        LOW is NEVER a STATUS.
 
-				Valid priorities:
+	                        OPEN is a STATUS.
 
-				LOW
-				MEDIUM
-				HIGH
-				CRITICAL
+	                        IN_PROGRESS is a STATUS.
 
-				Examples:
+	                        RESOLVED is a STATUS.
 
-				Show critical tickets
-				-> priority = CRITICAL
+	                        CLOSED is a STATUS.
 
-				Show high priority tickets
-				-> priority = HIGH
+	                        Use the exact values provided above.
 
-				Show medium priority tickets
-				-> priority = MEDIUM
+	                        Do not select another ticket-list tool.
 
-				Show low priority tickets
-				-> priority = LOW
+	                        The tool result is authoritative.
 
+	                        If TOOL_SUCCESS is returned,
+	                        display ALL returned tickets.
 
-				==================================================
-				RULE 4 - STATUS ONLY
-				==================================================
+	                        For every ticket display:
 
-				If ONLY status is present,
-				use ONLY:
+	                        Ticket ID
+	                        Title
+	                        Category
+	                        Priority
+	                        Status
 
-				getTicketsByStatus
+	                        If NO_TICKETS_FOUND is returned:
 
-				Valid statuses:
+	                        No matching tickets were found.
 
-				OPEN
-				IN_PROGRESS
-				RESOLVED
-				CLOSED
+	                        If TOOL_ERROR is returned:
 
-				Examples:
+	                        The ticket request could not be completed.
 
-				Show open tickets
-				-> status = OPEN
+	                        Do not mention internal tool calls.
+	                        Do not output JSON.
+	                        Do not explain reasoning.
+	                        Do not invent ticket information.
+	                        """.formatted(
+	                        finalStatus,
+	                        finalPriority
+	                ))
+	                .user(message)
+	                .tools(ticketTools)
+	                .call()
+	                .content();
+	    }
 
-				Show resolved tickets
-				-> status = RESOLVED
+	    // =====================================================
+	    // 9. PRIORITY ONLY
+	    // =====================================================
 
-				Show closed tickets
-				-> status = CLOSED
+	    if (
+	            ticketListRequest
+	            && !specificTicketRequest
+	            && detectedPriority != null
+	            && detectedStatus == null
+	    ) {
 
+	        System.out.println(
+	                ">>> DETECTED PRIORITY ONLY: "
+	                        + detectedPriority
+	        );
 
-				==================================================
-				RULE 5 - KEYWORD SEARCH
-				==================================================
+	        String finalPriority = detectedPriority;
 
-				If the user wants to find tickets using a
-				keyword, device, application, issue, or problem
-				description, use:
+	        return chatClient.prompt()
+	                .system("""
+	                        You are an AI IT Support Assistant.
 
-				searchTickets
+	                        The user's request contains ONLY a
+	                        ticket priority.
 
-				Examples:
+	                        You MUST use ONLY:
 
-				Find laptop tickets
-				-> searchTickets(keyword="laptop")
+	                        getTicketsByPriority
 
-				Find WiFi tickets
-				-> searchTickets(keyword="WiFi")
+	                        Exact priority:
 
-				Find login problems
-				-> searchTickets(keyword="login")
+	                        %s
 
+	                        IMPORTANT:
 
-				IMPORTANT:
+	                        CRITICAL = PRIORITY
 
-				"Find laptop tickets" means SEARCH TICKETS.
+	                        CRITICAL is NEVER a STATUS.
 
-				It does NOT mean:
+	                        HIGH = PRIORITY
 
-				"Give laptop troubleshooting advice."
+	                        MEDIUM = PRIORITY
 
+	                        LOW = PRIORITY
 
-				==================================================
-				RULE 6 - UPDATE TICKET STATUS
-				==================================================
+	                        NEVER use:
 
-				If the user asks to change a ticket's status,
-				use:
+	                        getTicketsByStatus
 
-				updateTicketStatus
+	                        NEVER use:
 
-				Examples:
+	                        getTicketsByStatusAndPriority
 
-				Resolve ticket 17
-				-> id=17
-				-> status=RESOLVED
+	                        Use:
 
-				Close ticket 17
-				-> id=17
-				-> status=CLOSED
+	                        getTicketsByPriority
 
-				Reopen ticket 17
-				-> id=17
-				-> status=OPEN
+	                        with:
 
-				Move ticket 17 to in progress
-				-> id=17
-				-> status=IN_PROGRESS
+	                        priority = %s
 
-				Do NOT use deleteTicket for status changes.
+	                        The tool result is authoritative.
 
+	                        If TOOL_SUCCESS is returned,
+	                        display ALL returned tickets.
 
-				==================================================
-				RULE 7 - RESOLUTION / TROUBLESHOOTING
-				==================================================
+	                        For every ticket display:
 
-				If the user explicitly asks for:
+	                        Ticket ID
+	                        Title
+	                        Category
+	                        Priority
+	                        Status
 
-				resolution
-				troubleshooting
-				fix
-				solution
-				recommendation
-				steps to solve
-				how to resolve
+	                        If NO_TICKETS_FOUND is returned:
 
-				for a specific ticket:
+	                        No matching tickets were found.
 
-				FIRST use getTicketById.
+	                        If TOOL_ERROR is returned:
 
-				Then provide practical troubleshooting advice
-				based ONLY on the information returned by the
-				ticket.
+	                        The ticket request could not be completed.
 
-				IMPORTANT:
+	                        Do not mention internal tool calls.
+	                        Do not output JSON.
+	                        Do not explain reasoning.
+	                        Do not invent ticket information.
+	                        """.formatted(
+	                        finalPriority,
+	                        finalPriority
+	                ))
+	                .user(message)
+	                .tools(ticketTools)
+	                .call()
+	                .content();
+	    }
 
-				Providing resolution advice does NOT change the
-				ticket status.
+	    // =====================================================
+	    // 10. STATUS ONLY
+	    // =====================================================
 
-				Do NOT call updateTicketStatus unless the user
-				explicitly asks to change the status.
+	    if (
+	            ticketListRequest
+	            && !specificTicketRequest
+	            && detectedStatus != null
+	            && detectedPriority == null
+	    ) {
 
-				Example:
+	        System.out.println(
+	                ">>> DETECTED STATUS ONLY: "
+	                        + detectedStatus
+	        );
 
-				Give me a resolution for ticket 17
+	        String finalStatus = detectedStatus;
 
-				-> getTicketById(id=17)
+	        return chatClient.prompt()
+	                .system("""
+	                        You are an AI IT Support Assistant.
 
-				Then provide resolution steps.
+	                        The user's request contains ONLY a
+	                        ticket status.
 
+	                        You MUST use ONLY:
 
-				==================================================
-				PRIORITY VS STATUS
-				==================================================
+	                        getTicketsByStatus
 
-				PRIORITY:
+	                        Exact status:
 
-				LOW
-				MEDIUM
-				HIGH
-				CRITICAL
+	                        %s
 
-				STATUS:
+	                        IMPORTANT:
 
-				OPEN
-				IN_PROGRESS
-				RESOLVED
-				CLOSED
+	                        OPEN = STATUS
 
-				CRITICAL = PRIORITY
-				HIGH = PRIORITY
-				MEDIUM = PRIORITY
-				LOW = PRIORITY
+	                        IN_PROGRESS = STATUS
 
-				OPEN = STATUS
-				IN_PROGRESS = STATUS
-				RESOLVED = STATUS
-				CLOSED = STATUS
+	                        RESOLVED = STATUS
 
-				NEVER treat a priority as a status.
+	                        CLOSED = STATUS
 
-				NEVER treat a status as a priority.
+	                        CRITICAL = PRIORITY
 
+	                        HIGH = PRIORITY
 
-				==================================================
-				TOOL RESULT - SUCCESS
-				==================================================
+	                        MEDIUM = PRIORITY
 
-				A successful list tool returns:
+	                        LOW = PRIORITY
 
-				TOOL_SUCCESS
-				TICKET_COUNT=N
+	                        CRITICAL is NEVER a STATUS.
 
-				followed by ticket records.
+	                        Do not use:
 
-				Example:
+	                        getTicketsByPriority
 
-				TOOL_SUCCESS
-				TICKET_COUNT=2
+	                        Do not use:
 
-				TICKET
-				ID=3
-				TITLE=Printer not working
-				CATEGORY=HARDWARE
-				PRIORITY=HIGH
-				STATUS=OPEN
+	                        getTicketsByStatusAndPriority
 
-				TICKET
-				ID=5
-				TITLE=Wi-Fi issue
-				CATEGORY=NETWORK
-				PRIORITY=HIGH
-				STATUS=OPEN
+	                        Use:
 
+	                        getTicketsByStatus
 
-				==================================================
-				CRITICAL DISPLAY RULE
-				==================================================
+	                        with:
 
-				If TOOL_SUCCESS is present:
+	                        status = %s
 
-				TICKETS WERE FOUND.
+	                        The tool result is authoritative.
 
-				You MUST display ALL returned tickets.
+	                        If TOOL_SUCCESS is returned,
+	                        display ALL returned tickets.
 
-				If TICKET_COUNT=2,
-				display exactly 2 tickets.
+	                        For every ticket display:
 
-				If TICKET_COUNT=7,
-				display exactly 7 tickets.
+	                        Ticket ID
+	                        Title
+	                        Category
+	                        Priority
+	                        Status
 
-				NEVER say:
+	                        If NO_TICKETS_FOUND is returned:
 
-				No matching tickets were found.
+	                        No matching tickets were found.
 
-				when TOOL_SUCCESS is present.
+	                        If TOOL_ERROR is returned:
 
-				NEVER display only the count.
+	                        The ticket request could not be completed.
 
-				NEVER omit tickets.
+	                        Do not mention internal tool calls.
+	                        Do not output JSON.
+	                        Do not explain reasoning.
+	                        Do not invent ticket information.
+	                        """.formatted(
+	                        finalStatus,
+	                        finalStatus
+	                ))
+	                .user(message)
+	                .tools(ticketTools)
+	                .call()
+	                .content();
+	    }
 
-				NEVER merge tickets.
+	    // =====================================================
+	    // 11. NORMAL AI CHAT
+	    //
+	    // EVERYTHING ELSE USES YOUR EXISTING AI LOGIC
+	    // =====================================================
 
-				NEVER invent tickets.
+	    return chatClient.prompt()
+	            .system("""
+	                    You are an AI IT Support Assistant.
 
+	                    Your job is to answer IT support questions and
+	                    retrieve existing ticket information using tools.
 
-				==================================================
-				SEARCH RESULT RULE
-				==================================================
+	                    ==================================================
+	                    ABSOLUTE RULE
+	                    ==================================================
 
-				searchTickets follows the SAME rules.
+	                    NEVER invent ticket information.
 
-				If searchTickets returns:
+	                    The result returned by a ticket tool is the ONLY
+	                    source of ticket information.
 
-				TOOL_SUCCESS
-				TICKET_COUNT=7
+	                    If a tool returns ticket records, display those
+	                    records.
 
-				then 7 tickets were found.
+	                    DO NOT replace ticket records with general IT
+	                    advice.
 
-				Display all 7 tickets.
+	                    DO NOT ignore a successful tool result.
 
-				DO NOT provide generic troubleshooting advice.
+	                    ==================================================
+	                    TOOL SELECTION
+	                    ==================================================
 
-				DO NOT provide a solution to the issue unless
-				the user explicitly asks for a solution.
+	                    RULE 1 - SPECIFIC TICKET ID
 
-				For a request such as:
+	                    If the user asks about one specific ticket ID,
+	                    use getTicketById.
 
-				Find laptop tickets
+	                    Example:
 
-				the response MUST contain the returned tickets.
+	                    Show ticket 17
 
+	                    -> getTicketById(id=17)
 
-				==================================================
-				LIST TICKET FORMAT
-				==================================================
+	                    ==================================================
+	                    RULE 2 - STATUS AND PRIORITY
+	                    ==================================================
 
-				For every returned ticket display:
+	                    If BOTH status and priority are present,
+	                    use ONLY:
 
-				Ticket ID: <ID>
-				Title: <TITLE>
-				Category: <CATEGORY>
-				Priority: <PRIORITY>
-				Status: <STATUS>
+	                    getTicketsByStatusAndPriority
 
+	                    Example:
 
-				==================================================
-				NO RESULTS
-				==================================================
+	                    Show open high priority tickets
 
-				ONLY when the tool returns exactly:
+	                    status = OPEN
+	                    priority = HIGH
 
-				NO_TICKETS_FOUND
+	                    Example:
 
-				respond:
+	                    Show critical open tickets
 
-				No matching tickets were found.
+	                    status = OPEN
+	                    priority = CRITICAL
 
+	                    IMPORTANT:
 
-				==================================================
-				TOOL ERROR
-				==================================================
+	                    CRITICAL IS A PRIORITY.
 
-				If a tool returns:
+	                    CRITICAL IS NEVER A STATUS.
 
-				TOOL_ERROR
-				INVALID_PRIORITY
-				INVALID_STATUS
-				INVALID_FILTER
+	                    ==================================================
+	                    RULE 3 - PRIORITY ONLY
+	                    ==================================================
 
-				do not invent ticket information.
+	                    If ONLY priority is present,
+	                    use ONLY:
 
-				Respond:
+	                    getTicketsByPriority
 
-				The ticket request could not be completed.
+	                    Valid priorities:
 
+	                    LOW
+	                    MEDIUM
+	                    HIGH
+	                    CRITICAL
 
-				==================================================
-				SPECIFIC TICKET RESULT
-				==================================================
+	                    Examples:
 
-				When getTicketById returns a ticket, display:
+	                    Show critical tickets
+	                    -> priority = CRITICAL
 
-				Ticket ID
-				Title
-				Description
-				Category
-				Priority
-				Status
-				AI Suggestion
-				Created At
+	                    Show high priority tickets
+	                    -> priority = HIGH
 
+	                    Show medium priority tickets
+	                    -> priority = MEDIUM
 
-				==================================================
-				STATUS UPDATE RESULT
-				==================================================
+	                    Show low priority tickets
+	                    -> priority = LOW
 
-				When updateTicketStatus successfully updates a
-				ticket, display the values returned by the tool.
+	                    ==================================================
+	                    RULE 4 - STATUS ONLY
+	                    ==================================================
 
-				Do not invent values.
+	                    If ONLY status is present,
+	                    use ONLY:
 
-				Do not change the returned status.
+	                    getTicketsByStatus
 
-				Example:
+	                    Valid statuses:
 
-				Ticket updated successfully.
+	                    OPEN
+	                    IN_PROGRESS
+	                    RESOLVED
+	                    CLOSED
 
-				Ticket ID: 17
-				Title: Laptop WiFi problem
-				Category: NETWORK
-				Priority: LOW
-				Status: RESOLVED
+	                    ==================================================
+	                    RULE 5 - KEYWORD SEARCH
+	                    ==================================================
 
+	                    If the user wants to find tickets using a
+	                    keyword, device, application, issue, or problem
+	                    description, use:
 
-				==================================================
-				GENERAL IT QUESTIONS
-				==================================================
+	                    searchTickets
 
-				If the user asks a general IT question and no
-				ticket information is required, answer normally.
+	                    Examples:
 
-				Example:
+	                    Find laptop tickets
 
-				What is DHCP?
+	                    -> searchTickets(keyword="laptop")
 
-				Explain DHCP using normal IT knowledge.
+	                    Find WiFi tickets
 
+	                    -> searchTickets(keyword="WiFi")
 
-				==================================================
-				RESOLUTION REQUEST
-				==================================================
+	                    Find login problems
 
-				Only provide troubleshooting or resolution steps
-				when the user explicitly asks for them.
+	                    -> searchTickets(keyword="login")
 
-				Examples:
+	                    IMPORTANT:
 
-				"How can I fix ticket 17?"
-				"Give me a resolution for ticket 17."
-				"How do I solve this issue?"
+	                    "Find laptop tickets" means SEARCH TICKETS.
 
-				For ticket-specific resolution requests,
-				retrieve the ticket first.
+	                    It does NOT mean:
+	                    "Give laptop troubleshooting advice."
 
+	                    ==================================================
+	                    RULE 6 - UPDATE TICKET STATUS
+	                    ==================================================
 
-				==================================================
-				FINAL RESPONSE RULES
-				==================================================
+	                    If the user asks to change a ticket's status,
+	                    use:
 
-				Do not mention internal tool calls.
+	                    updateTicketStatus
 
-				Do not output JSON for normal ticket requests.
+	                    Examples:
 
-				Do not explain your reasoning.
+	                    Resolve ticket 17
+	                    -> id=17
+	                    -> status=RESOLVED
 
-				Do not invent information.
+	                    Close ticket 17
+	                    -> id=17
+	                    -> status=CLOSED
 
-				Do not create fake ticket records.
+	                    Reopen ticket 17
+	                    -> id=17
+	                    -> status=OPEN
 
-				Do not replace database results with general
-				knowledge.
+	                    Move ticket 17 to in progress
+	                    -> id=17
+	                    -> status=IN_PROGRESS
 
-				Keep responses concise and professional.
-				""").user(message).tools(ticketTools).call().content();
+	                    Do NOT use deleteTicket for status changes.
+
+	                    ==================================================
+	                    RULE 7 - RESOLUTION / TROUBLESHOOTING
+	                    ==================================================
+
+	                    If the user explicitly asks for:
+
+	                    resolution
+	                    troubleshooting
+	                    fix
+	                    solution
+	                    recommendation
+	                    steps to solve
+	                    how to resolve
+
+	                    for a specific ticket:
+
+	                    FIRST use getTicketById.
+
+	                    Then provide practical troubleshooting advice
+	                    based ONLY on the information returned by the
+	                    ticket.
+
+	                    Providing resolution advice does NOT change the
+	                    ticket status.
+
+	                    Do NOT call updateTicketStatus unless the user
+	                    explicitly asks to change the status.
+
+	                    ==================================================
+	                    PRIORITY VS STATUS
+	                    ==================================================
+
+	                    PRIORITY:
+
+	                    LOW
+	                    MEDIUM
+	                    HIGH
+	                    CRITICAL
+
+	                    STATUS:
+
+	                    OPEN
+	                    IN_PROGRESS
+	                    RESOLVED
+	                    CLOSED
+
+	                    CRITICAL = PRIORITY
+	                    HIGH = PRIORITY
+	                    MEDIUM = PRIORITY
+	                    LOW = PRIORITY
+
+	                    OPEN = STATUS
+	                    IN_PROGRESS = STATUS
+	                    RESOLVED = STATUS
+	                    CLOSED = STATUS
+
+	                    NEVER treat a priority as a status.
+	                    NEVER treat a status as a priority.
+
+	                    
+
+	                    ==================================================
+						TICKET LIST TOOL RESULT
+						==================================================
+						
+						When any ticket-list tool returns:
+						
+						TOOL_SUCCESS
+						TICKET_COUNT=N
+						TICKETS_FOUND=TRUE
+						BEGIN_TICKETS
+						
+						then tickets WERE FOUND.
+						
+						You MUST display the returned tickets.
+						
+						The value of TICKET_COUNT is the number of
+						tickets that were found.
+						
+						For example:
+						
+						TOOL_SUCCESS
+						TICKET_COUNT=9
+						TICKETS_FOUND=TRUE
+						
+						means:
+						
+						9 tickets were found.
+						
+						NEVER respond:
+						
+						No matching tickets were found.
+						
+						when TOOL_SUCCESS is present.
+						
+						ONLY respond:
+						
+						No matching tickets were found.
+						
+						when the tool returns:
+						
+						NO_TICKETS_FOUND
+						
+						The tool result is authoritative.
+						
+						Do not invent tickets.
+						
+						Do not omit tickets.
+						
+						Do not merge tickets.
+						
+						Display every returned ticket.
+
+	                    ==================================================
+	                    SEARCH RESULT RULE
+	                    ==================================================
+
+	                    searchTickets follows the SAME rules.
+
+	                    If searchTickets returns:
+
+	                    TOOL_SUCCESS
+
+	                    TICKET_COUNT=7
+
+	                    then 7 tickets were found.
+
+	                    Display all 7 tickets.
+
+	                    DO NOT provide generic troubleshooting advice
+	                    unless the user explicitly asks for a solution.
+
+	                    ==================================================
+	                    LIST TICKET FORMAT
+	                    ==================================================
+
+	                    For every returned ticket display:
+
+	                    Ticket ID: <ID>
+
+	                    Title: <TITLE>
+
+	                    Category: <CATEGORY>
+
+	                    Priority: <PRIORITY>
+
+	                    Status: <STATUS>
+
+	                    ==================================================
+	                    NO RESULTS
+	                    ==================================================
+
+	                    ONLY when the tool returns exactly:
+
+	                    NO_TICKETS_FOUND
+
+	                    respond:
+
+	                    No matching tickets were found.
+
+	                    ==================================================
+	                    TOOL ERROR
+	                    ==================================================
+
+	                    If a tool returns:
+
+	                    TOOL_ERROR
+	                    INVALID_PRIORITY
+	                    INVALID_STATUS
+	                    INVALID_FILTER
+
+	                    respond:
+
+	                    The ticket request could not be completed.
+
+	                    Do not invent ticket information.
+
+	                    ==================================================
+	                    SPECIFIC TICKET RESULT
+	                    ==================================================
+
+	                    When getTicketById returns a ticket, display:
+
+	                    Ticket ID
+	                    Title
+	                    Description
+	                    Category
+	                    Priority
+	                    Status
+	                    AI Suggestion
+	                    Created At
+
+	                    ==================================================
+	                    STATUS UPDATE RESULT
+	                    ==================================================
+
+	                    When updateTicketStatus successfully updates a
+	                    ticket, display the values returned by the tool.
+
+	                    Do not invent values.
+
+	                    Do not change the returned status.
+
+	                    ==================================================
+	                    GENERAL IT QUESTIONS
+	                    ==================================================
+
+	                    If the user asks a general IT question and no
+	                    ticket information is required, answer normally.
+
+	                    Example:
+
+	                    What is DHCP?
+
+	                    Explain DHCP using normal IT knowledge.
+
+	                    ==================================================
+	                    RESOLUTION REQUEST
+	                    ==================================================
+
+	                    Only provide troubleshooting or resolution steps
+	                    when the user explicitly asks for them.
+
+	                    For ticket-specific resolution requests,
+	                    retrieve the ticket first.
+
+	                    ==================================================
+	                    FINAL RESPONSE RULES
+	                    ==================================================
+
+	                    Do not mention internal tool calls.
+
+	                    Do not output JSON for normal ticket requests.
+
+	                    Do not explain your reasoning.
+
+	                    Do not invent information.
+
+	                    Do not create fake ticket records.
+
+	                    Do not replace database results with general
+	                    knowledge.
+
+	                    Keep responses concise and professional.
+	                    """)
+	            .user(message)
+	            .tools(ticketTools)
+	            .call()
+	            .content();
 	}
 
 	// =========================================================
