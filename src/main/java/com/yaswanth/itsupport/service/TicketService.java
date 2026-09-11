@@ -3,6 +3,8 @@ package com.yaswanth.itsupport.service;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import com.yaswanth.itsupport.ai.AiTicketAnalyzer;
@@ -10,28 +12,41 @@ import com.yaswanth.itsupport.dto.AiTicketAnalysisResponse;
 import com.yaswanth.itsupport.dto.TicketRequest;
 import com.yaswanth.itsupport.dto.TicketResponse;
 import com.yaswanth.itsupport.entity.Ticket;
+import com.yaswanth.itsupport.entity.User;
 import com.yaswanth.itsupport.enums.TicketPriority;
 import com.yaswanth.itsupport.enums.TicketStatus;
 import com.yaswanth.itsupport.expection.TicketNotFoundException;
 import com.yaswanth.itsupport.repository.TicketRepository;
+import com.yaswanth.itsupport.repository.UserRepository;
 
 @Service
 public class TicketService {
 
 	private final TicketRepository ticketRepository;
 	private final AiTicketAnalyzer aiTicketAnalyzer;
+	private final UserRepository userRepository;
 
-	public TicketService(TicketRepository ticketRepository, AiTicketAnalyzer aiTicketAnalyzer) {
+	public TicketService(TicketRepository ticketRepository, AiTicketAnalyzer aiTicketAnalyzer,
+			UserRepository userRepository) {
 
 		this.ticketRepository = ticketRepository;
 		this.aiTicketAnalyzer = aiTicketAnalyzer;
+		this.userRepository = userRepository;
 
 	}
 
 	// CREATE TICKET
 	public TicketResponse createTicket(TicketRequest request) {
 
+		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+		String username = authentication.getName();
+
+		User user = userRepository.findByUsername(username).orElseThrow(() -> new RuntimeException("User not found"));
+
 		Ticket ticket = new Ticket();
+
+		ticket.setUser(user);
 
 		ticket.setTitle(request.getTitle());
 		ticket.setDescription(request.getDescription());
@@ -80,10 +95,25 @@ public class TicketService {
 				ticket.getPriority(), ticket.getStatus(), ticket.getAiSuggestion(), ticket.getCreatedAt());
 	}
 
-	// GET ALL TICKETS
+	// GET TICKETS BASED ON USER ROLE
 	public List<TicketResponse> getAllTickets() {
 
-		return ticketRepository.findAll().stream().map(this::convertToResponse).toList();
+		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+		String username = authentication.getName();
+
+		boolean isAdmin = authentication.getAuthorities().stream()
+				.anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
+
+		List<Ticket> tickets;
+
+		if (isAdmin) {
+			tickets = ticketRepository.findAll();
+		} else {
+			tickets = ticketRepository.findByUserUsername(username);
+		}
+
+		return tickets.stream().map(this::convertToResponse).toList();
 	}
 
 	// GET TICKET BY ID
@@ -91,6 +121,18 @@ public class TicketService {
 
 		Ticket ticket = ticketRepository.findById(id)
 				.orElseThrow(() -> new TicketNotFoundException("Ticket not found with id: " + id));
+
+		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+		String username = authentication.getName();
+
+		boolean isAdmin = authentication.getAuthorities().stream()
+				.anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
+
+		if (!isAdmin && !ticket.getUser().getUsername().equals(username)) {
+
+			throw new TicketNotFoundException("Ticket not found with id: " + id);
+		}
 
 		return convertToResponse(ticket);
 	}
@@ -100,6 +142,18 @@ public class TicketService {
 
 		Ticket existingTicket = ticketRepository.findById(id)
 				.orElseThrow(() -> new TicketNotFoundException("Ticket not found with id: " + id));
+
+		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+		String username = authentication.getName();
+
+		boolean isAdmin = authentication.getAuthorities().stream()
+				.anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
+
+		if (!isAdmin && !existingTicket.getUser().getUsername().equals(username)) {
+
+			throw new TicketNotFoundException("Ticket not found with id: " + id);
+		}
 
 		existingTicket.setTitle(request.getTitle());
 		existingTicket.setDescription(request.getDescription());
@@ -130,6 +184,15 @@ public class TicketService {
 		Ticket ticket = ticketRepository.findById(id)
 				.orElseThrow(() -> new TicketNotFoundException("Ticket not found with id: " + id));
 
+		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+		boolean isAdmin = authentication.getAuthorities().stream()
+				.anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
+
+		if (!isAdmin) {
+			throw new TicketNotFoundException("Ticket not found with id: " + id);
+		}
+
 		ticketRepository.delete(ticket);
 	}
 
@@ -137,25 +200,87 @@ public class TicketService {
 
 	public List<TicketResponse> getTicketsByStatus(TicketStatus status) {
 
-		return ticketRepository.findByStatus(status).stream().map(this::convertToResponse).toList();
+		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+		String username = authentication.getName();
+
+		boolean isAdmin = authentication.getAuthorities().stream()
+				.anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
+
+		List<Ticket> tickets;
+
+		if (isAdmin) {
+			tickets = ticketRepository.findByStatus(status);
+		} else {
+			tickets = ticketRepository.findByStatusAndUserUsername(status, username);
+		}
+
+		return tickets.stream().map(this::convertToResponse).toList();
 	}
 
 	// FILTER TICKETS BY PRIORITY
+
 	public List<TicketResponse> getTicketsByPriority(TicketPriority priority) {
 
-		return ticketRepository.findByPriority(priority).stream().map(this::convertToResponse).toList();
+		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+		String username = authentication.getName();
+
+		boolean isAdmin = authentication.getAuthorities().stream()
+				.anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
+
+		List<Ticket> tickets;
+
+		if (isAdmin) {
+			tickets = ticketRepository.findByPriority(priority);
+		} else {
+			tickets = ticketRepository.findByPriorityAndUserUsername(priority, username);
+		}
+
+		return tickets.stream().map(this::convertToResponse).toList();
 	}
 
 	// FILTER TICKETS BY STATUS AND PRIORITY
+
 	public List<TicketResponse> getTicketsByStatusAndPriority(TicketStatus status, TicketPriority priority) {
 
-		return ticketRepository.findByStatusAndPriority(status, priority).stream().map(this::convertToResponse)
-				.toList();
+		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+		String username = authentication.getName();
+
+		boolean isAdmin = authentication.getAuthorities().stream()
+				.anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
+
+		List<Ticket> tickets;
+
+		if (isAdmin) {
+			tickets = ticketRepository.findByStatusAndPriority(status, priority);
+		} else {
+			tickets = ticketRepository.findByStatusAndPriorityAndUserUsername(status, priority, username);
+		}
+
+		return tickets.stream().map(this::convertToResponse).toList();
 	}
 
-	// FILTER TICKETS BY CTAEGORY OR DESCRIPTION
+	// FILTER TICKETS BY CATEGORY OR DESCRIPTION
+
 	public List<TicketResponse> searchTickets(String keyword) {
 
-		return ticketRepository.searchTickets(keyword).stream().map(this::convertToResponse).toList();
+		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+		String username = authentication.getName();
+
+		boolean isAdmin = authentication.getAuthorities().stream()
+				.anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
+
+		List<Ticket> tickets;
+
+		if (isAdmin) {
+			tickets = ticketRepository.searchTickets(keyword);
+		} else {
+			tickets = ticketRepository.searchTicketsByUser(keyword, username);
+		}
+
+		return tickets.stream().map(this::convertToResponse).toList();
 	}
 }
