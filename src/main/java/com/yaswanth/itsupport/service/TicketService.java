@@ -6,6 +6,7 @@ import java.util.List;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.yaswanth.itsupport.ai.AiTicketAnalyzer;
 import com.yaswanth.itsupport.dto.AiTicketAnalysisResponse;
@@ -25,14 +26,15 @@ public class TicketService {
 	private final TicketRepository ticketRepository;
 	private final AiTicketAnalyzer aiTicketAnalyzer;
 	private final UserRepository userRepository;
+	private final TicketHistoryService ticketHistoryService;
 
 	public TicketService(TicketRepository ticketRepository, AiTicketAnalyzer aiTicketAnalyzer,
-			UserRepository userRepository) {
+			UserRepository userRepository, TicketHistoryService ticketHistoryService) {
 
 		this.ticketRepository = ticketRepository;
 		this.aiTicketAnalyzer = aiTicketAnalyzer;
 		this.userRepository = userRepository;
-
+		this.ticketHistoryService = ticketHistoryService;
 	}
 
 	// CREATE TICKET
@@ -84,6 +86,9 @@ public class TicketService {
 		Ticket savedTicket = ticketRepository.save(ticket);
 
 		System.out.println(">>> TICKET CREATED WITH ID: " + savedTicket.getId());
+
+		// Record ticket creation history
+		ticketHistoryService.recordActivity(savedTicket, "CREATED", null, savedTicket.getStatus().toString());
 
 		return convertToResponse(savedTicket);
 	}
@@ -137,7 +142,7 @@ public class TicketService {
 		return convertToResponse(ticket);
 	}
 
-	// UPDATE THE TCKET
+	// UPDATE THE TICKET
 	public TicketResponse updateTicket(Long id, TicketRequest request) {
 
 		Ticket existingTicket = ticketRepository.findById(id)
@@ -150,17 +155,65 @@ public class TicketService {
 		boolean isAdmin = authentication.getAuthorities().stream()
 				.anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
 
+		// Only ADMIN or ticket owner can update the ticket
 		if (!isAdmin && !existingTicket.getUser().getUsername().equals(username)) {
 
 			throw new TicketNotFoundException("Ticket not found with id: " + id);
 		}
 
+		// Store old values before updating
+		String oldTitle = existingTicket.getTitle();
+		String oldDescription = existingTicket.getDescription();
+		String oldCategory = existingTicket.getCategory();
+		TicketPriority oldPriority = existingTicket.getPriority();
+
+		// Update ticket fields
 		existingTicket.setTitle(request.getTitle());
 		existingTicket.setDescription(request.getDescription());
 		existingTicket.setCategory(request.getCategory());
 		existingTicket.setPriority(request.getPriority());
 
 		Ticket updatedTicket = ticketRepository.save(existingTicket);
+
+		// =========================================================
+		// RECORD TITLE CHANGE
+		// =========================================================
+
+		if (!java.util.Objects.equals(oldTitle, updatedTicket.getTitle())) {
+
+			ticketHistoryService.recordActivity(updatedTicket, "TITLE_CHANGED", oldTitle, updatedTicket.getTitle());
+		}
+
+		// =========================================================
+		// RECORD DESCRIPTION CHANGE
+		// =========================================================
+
+		if (!java.util.Objects.equals(oldDescription, updatedTicket.getDescription())) {
+
+			ticketHistoryService.recordActivity(updatedTicket, "DESCRIPTION_CHANGED", oldDescription,
+					updatedTicket.getDescription());
+		}
+
+		// =========================================================
+		// RECORD CATEGORY CHANGE
+		// =========================================================
+
+		if (!java.util.Objects.equals(oldCategory, updatedTicket.getCategory())) {
+
+			ticketHistoryService.recordActivity(updatedTicket, "CATEGORY_CHANGED", oldCategory,
+					updatedTicket.getCategory());
+		}
+
+		// =========================================================
+		// RECORD PRIORITY CHANGE
+		// =========================================================
+
+		if (!java.util.Objects.equals(oldPriority, updatedTicket.getPriority())) {
+
+			ticketHistoryService.recordActivity(updatedTicket, "PRIORITY_CHANGED",
+					oldPriority != null ? oldPriority.toString() : null,
+					updatedTicket.getPriority() != null ? updatedTicket.getPriority().toString() : null);
+		}
 
 		return convertToResponse(updatedTicket);
 	}
@@ -171,14 +224,32 @@ public class TicketService {
 		Ticket existingTicket = ticketRepository.findById(id)
 				.orElseThrow(() -> new TicketNotFoundException("Ticket not found with id: " + id));
 
+		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+		boolean isAdmin = authentication.getAuthorities().stream()
+				.anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
+
+		// Only ADMIN can change ticket status
+		if (!isAdmin) {
+			throw new TicketNotFoundException("Ticket not found with id: " + id);
+		}
+
+		// Store the old status before changing it
+		TicketStatus oldStatus = existingTicket.getStatus();
+
 		existingTicket.setStatus(status);
 
 		Ticket updatedTicket = ticketRepository.save(existingTicket);
+
+		// Record status change in history
+		ticketHistoryService.recordActivity(updatedTicket, "STATUS_CHANGED",
+				oldStatus != null ? oldStatus.toString() : null, status.toString());
 
 		return convertToResponse(updatedTicket);
 	}
 
 	// DELETE TICKET
+	@Transactional
 	public void deleteTicket(Long id) {
 
 		Ticket ticket = ticketRepository.findById(id)
@@ -189,10 +260,16 @@ public class TicketService {
 		boolean isAdmin = authentication.getAuthorities().stream()
 				.anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
 
+		// Only ADMIN can delete tickets
 		if (!isAdmin) {
 			throw new TicketNotFoundException("Ticket not found with id: " + id);
 		}
 
+		// Record deletion before deleting the ticket
+		ticketHistoryService.recordActivity(ticket, "DELETED",
+				ticket.getStatus() != null ? ticket.getStatus().toString() : null, null);
+
+		// Delete the ticket
 		ticketRepository.delete(ticket);
 	}
 

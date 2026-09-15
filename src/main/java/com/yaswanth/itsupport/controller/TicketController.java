@@ -15,10 +15,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.yaswanth.itsupport.dto.TicketHistoryResponse;
 import com.yaswanth.itsupport.dto.TicketRequest;
 import com.yaswanth.itsupport.dto.TicketResponse;
 import com.yaswanth.itsupport.enums.TicketPriority;
 import com.yaswanth.itsupport.enums.TicketStatus;
+import com.yaswanth.itsupport.service.TicketHistoryService;
 import com.yaswanth.itsupport.service.TicketService;
 
 import jakarta.validation.Valid;
@@ -28,15 +30,25 @@ import jakarta.validation.Valid;
 public class TicketController {
 
 	private final TicketService ticketService;
+	private final TicketHistoryService ticketHistoryService;
 
-	public TicketController(TicketService ticketService) {
+	public TicketController(TicketService ticketService, TicketHistoryService ticketHistoryService) {
 		this.ticketService = ticketService;
+		this.ticketHistoryService = ticketHistoryService;
 	}
 
 	@PostMapping
 	public TicketResponse createTicket(@Valid @RequestBody TicketRequest request) {
 
 		return ticketService.createTicket(request);
+	}
+ 
+    // Get Audit history
+	@GetMapping("/{id}/history")
+	public List<TicketHistoryResponse> getTicketHistory(
+	        @PathVariable Long id) {
+
+	    return ticketHistoryService.getHistoryByTicketId(id);
 	}
 
 	// http://localhost:8080/api/tickets
@@ -57,13 +69,12 @@ public class TicketController {
 
 		return ticketService.updateTicket(id, request);
 	}
-	//Updating the status
-	@PutMapping("/{id}/status")
-	public TicketResponse updateTicketStatus(
-	        @PathVariable Long id,
-	        @RequestParam TicketStatus status) {
 
-	    return ticketService.updateTicketStatus(id, status);
+	// Updating the status
+	@PutMapping("/{id}/status")
+	public TicketResponse updateTicketStatus(@PathVariable Long id, @RequestParam TicketStatus status) {
+
+		return ticketService.updateTicketStatus(id, status);
 	}
 
 	@DeleteMapping("/{id}")
