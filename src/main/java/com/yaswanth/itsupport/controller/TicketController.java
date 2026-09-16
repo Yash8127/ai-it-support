@@ -50,6 +50,11 @@ public class TicketController {
 
 	    return ticketHistoryService.getHistoryByTicketId(id);
 	}
+	//get deleted tickets
+	@GetMapping("/deleted")
+	public List<TicketHistoryResponse> getDeletedTickets() {
+	    return ticketHistoryService.getDeletedTicketHistory();
+	}
 
 	// http://localhost:8080/api/tickets
 	@GetMapping

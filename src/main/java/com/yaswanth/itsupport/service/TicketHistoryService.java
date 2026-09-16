@@ -23,14 +23,12 @@ public class TicketHistoryService {
 	private final UserRepository userRepository;
 	private final TicketRepository ticketRepository;
 
-	public TicketHistoryService(
-	        TicketHistoryRepository ticketHistoryRepository,
-	        UserRepository userRepository,
-	        TicketRepository ticketRepository) {
+	public TicketHistoryService(TicketHistoryRepository ticketHistoryRepository, UserRepository userRepository,
+			TicketRepository ticketRepository) {
 
-	    this.ticketHistoryRepository = ticketHistoryRepository;
-	    this.userRepository = userRepository;
-	    this.ticketRepository = ticketRepository;
+		this.ticketHistoryRepository = ticketHistoryRepository;
+		this.userRepository = userRepository;
+		this.ticketRepository = ticketRepository;
 	}
 
 	// =========================================================
@@ -84,5 +82,25 @@ public class TicketHistoryService {
 						history.getUser().getUsername(), history.getAction(), history.getOldValue(),
 						history.getNewValue(), history.getCreatedAt()))
 				.collect(Collectors.toList());
+	}
+
+	public List<TicketHistoryResponse> getDeletedTicketHistory() {
+
+		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+		boolean isAdmin = authentication.getAuthorities().stream()
+				.anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
+
+		if (!isAdmin) {
+			throw new RuntimeException("Access denied");
+		}
+
+		List<TicketHistory> deletedHistory = ticketHistoryRepository.findByActionOrderByCreatedAtDesc("DELETED");
+
+		return deletedHistory.stream()
+				.map(history -> new TicketHistoryResponse(history.getId(), history.getTicketId(),
+						history.getUser().getUsername(), history.getAction(), history.getOldValue(),
+						history.getNewValue(), history.getCreatedAt()))
+				.toList();
 	}
 }
