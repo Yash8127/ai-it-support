@@ -27,14 +27,17 @@ public class TicketService {
 	private final AiTicketAnalyzer aiTicketAnalyzer;
 	private final UserRepository userRepository;
 	private final TicketHistoryService ticketHistoryService;
+	private final NotificationService notificationService;
 
 	public TicketService(TicketRepository ticketRepository, AiTicketAnalyzer aiTicketAnalyzer,
-			UserRepository userRepository, TicketHistoryService ticketHistoryService) {
+			UserRepository userRepository, TicketHistoryService ticketHistoryService,
+			NotificationService notificationService) {
 
 		this.ticketRepository = ticketRepository;
 		this.aiTicketAnalyzer = aiTicketAnalyzer;
 		this.userRepository = userRepository;
 		this.ticketHistoryService = ticketHistoryService;
+		this.notificationService = notificationService;
 	}
 
 	// CREATE TICKET
@@ -89,6 +92,10 @@ public class TicketService {
 
 		// Record ticket creation history
 		ticketHistoryService.recordActivity(savedTicket, "CREATED", null, savedTicket.getStatus().toString());
+
+		// notification alert
+		notificationService.createNotification(savedTicket.getUser().getUsername(),
+				"Ticket #" + savedTicket.getId() + " was created successfully.", "TICKET_CREATED");
 
 		return convertToResponse(savedTicket);
 	}
@@ -213,6 +220,10 @@ public class TicketService {
 			ticketHistoryService.recordActivity(updatedTicket, "PRIORITY_CHANGED",
 					oldPriority != null ? oldPriority.toString() : null,
 					updatedTicket.getPriority() != null ? updatedTicket.getPriority().toString() : null);
+			// Record notification when priority changed
+			notificationService.createNotification(updatedTicket.getUser().getUsername(),
+					"Ticket #" + updatedTicket.getId() + " priority changed to " + updatedTicket.getPriority() + ".",
+					"PRIORITY_CHANGED");
 		}
 
 		return convertToResponse(updatedTicket);
@@ -244,6 +255,10 @@ public class TicketService {
 		// Record status change in history
 		ticketHistoryService.recordActivity(updatedTicket, "STATUS_CHANGED",
 				oldStatus != null ? oldStatus.toString() : null, status.toString());
+		// record notification when status changed
+		notificationService.createNotification(updatedTicket.getUser().getUsername(),
+				"Ticket #" + updatedTicket.getId() + " status changed to " + updatedTicket.getStatus() + ".",
+				"STATUS_CHANGED");
 
 		return convertToResponse(updatedTicket);
 	}
