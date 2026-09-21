@@ -277,6 +277,9 @@ public class AiChatService {
                 normalizedMessage.contains("tickets")
                 || normalizedMessage.contains("ticket list")
                 || normalizedMessage.contains("show me")
+                || normalizedMessage.contains("urgent")
+                || normalizedMessage.contains("immediate attention")
+                || normalizedMessage.contains("urgent attention")
                 || normalizedMessage.startsWith("show ")
                 || normalizedMessage.startsWith("list ")
                 || normalizedMessage.startsWith("find ")
@@ -342,21 +345,28 @@ public class AiChatService {
             // CRITICAL
             // -------------------------------------------------
 
-            if (
-                    normalizedMessage.contains(
-                            "critical priority"
-                    )
-                    || normalizedMessage.matches(
-                            ".*\\bcritical\\b.*tickets?.*"
-                    )
-                    || normalizedMessage.matches(
-                            ".*\\bcritical\\b.*priority.*"
-                    )
-            ) {
-
-                detectedPriority = "CRITICAL";
-
-            }
+        	if (
+        	        normalizedMessage.contains(
+        	                "critical priority"
+        	        )
+        	        || normalizedMessage.contains(
+        	                "urgent attention"
+        	        )
+        	        || normalizedMessage.contains(
+        	                "immediate attention"
+        	        )
+        	        || normalizedMessage.contains(
+        	                "urgent"
+        	        )
+        	        || normalizedMessage.matches(
+        	                ".*\\bcritical\\b.*tickets?.*"
+        	        )
+        	        || normalizedMessage.matches(
+        	                ".*\\bcritical\\b.*priority.*"
+        	        )
+        	) {
+        	    detectedPriority = "CRITICAL";
+        	}
 
             // -------------------------------------------------
             // HIGH

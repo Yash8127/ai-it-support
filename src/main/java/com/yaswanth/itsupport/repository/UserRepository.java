@@ -9,5 +9,7 @@ import com.yaswanth.itsupport.entity.User;
 public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findByUsername(String username);
+    Optional<User> findByEmail(String email);
+    Optional<User> findByResetToken(String resetToken);
 
 }
