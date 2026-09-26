@@ -4,6 +4,7 @@ import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Base64;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -19,6 +20,8 @@ public class AuthService {
 	private final PasswordEncoder passwordEncoder;
 	private final JwtService jwtService;
 	private final EmailService emailService;
+	@Value("${app.frontend.url}")
+	private String frontendUrl;
 
 	public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService,
 			EmailService emailService) {
@@ -97,7 +100,7 @@ public class AuthService {
 
 		userRepository.save(user);
 
-		String resetLink = "http://localhost:5173/reset-password?token=" + resetToken;
+		String resetLink = frontendUrl + "/reset-password?token=" + resetToken;
 
 		emailService.sendPasswordResetEmail(user.getEmail(), user.getUsername(), resetLink);
 
